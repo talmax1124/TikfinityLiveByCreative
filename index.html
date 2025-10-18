@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikFinityLive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 13px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+            transform: scale(1.1);
+        }
+
+        .checkbox-group label {
+            font-size: 13px;
+            margin-bottom: 0;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .status.live {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            animation: pulse 2s infinite;
+        }
+
+        .status.connected-waiting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.stopped {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .activity-log {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            max-height: 180px;
+        }
+
+        .activity-log h3 {
+            margin-bottom: 12px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .log-entry {
+            padding: 6px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            font-size: 11px;
+            border-left: 3px solid #667eea;
+            background: #f8f9fa;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 3px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            background: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #333;
+        }
+
+        .settings-group {
+            border-bottom: 1px solid #e1e5e9;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .settings-group:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .settings-group h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .danger-zone {
+            background: #fff5f5;
+            border: 1px solid #fed7d7;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .danger-zone h4 {
+            color: #c53030;
+            margin-bottom: 10px;
+        }
+
+        .danger-zone p {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .row .btn {
+            flex: 1;
+        }
+
+        .version-info {
+            text-align: center;
+            color: rgba(255,255,255,0.7);
+            font-size: 11px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔴 TikFinityLive</h1>
+            <p>Advanced TikTok Live Stream Notifier</p>
+            <div class="version-info">v1.0.0</div>
+        </div>
+
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="showTab('settings')">Settings</button>
+            <button class="tab-btn" onclick="showTab('monitor')">Monitor</button>
+            <button class="tab-btn" onclick="showTab('advanced')">Advanced</button>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="settings-tab">
+            <div class="card">
+                <div class="settings-group">
+                    <h4>🎯 Stream Monitoring</h4>
+                    <div class="form-group">
+                        <label for="username">TikTok Username:</label>
+                        <input type="text" id="username" placeholder="Enter username (without @)">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="webhookUrl">Discord Webhook URL:</label>
+                        <input type="url" id="webhookUrl" placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h4>🚀 Startup & Behavior</h4>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="autoStart">
+                        <label for="autoStart">Start with Windows/macOS</label>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="minimizeToTray">
+                        <label for="minimizeToTray">Minimize to system tray</label>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="showNotifications">
+                        <label for="showNotifications">Show desktop notifications</label>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h4>⏰ Monitoring Settings</h4>
+                    <div class="form-group">
+                        <label for="inactivityTimeout">Inactivity timeout (minutes):</label>
+                        <select id="inactivityTimeout">
+                            <option value="15">15 minutes</option>
+                            <option value="30" selected>30 minutes</option>
+                            <option value="45">45 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="120">2 hours</option>
+                        </select>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="reconnectOnFailure" checked>
+                        <label for="reconnectOnFailure">Auto-reconnect on connection failure</label>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+            </div>
+        </div>
+
+        <!-- Monitor Tab -->
+        <div id="monitor-tab" class="monitor-tab hidden">
+            <div id="connection-status" class="status stopped">
+                Not monitoring
+            </div>
+
+            <div class="card">
+                <div class="row">
+                    <button class="btn btn-primary" id="start-btn" onclick="startMonitoring()">▶️ Start</button>
+                    <button class="btn btn-danger hidden" id="stop-btn" onclick="stopMonitoring()">⏹️ Stop</button>
+                </div>
+            </div>
+
+            <div class="activity-log">
+                <h3>📋 Activity Log</h3>
+                <div id="log-container">
+                    <div class="log-entry">App started - Ready to monitor</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Tab -->
+        <div id="advanced-tab" class="advanced-tab hidden">
+            <div class="card">
+                <div class="settings-group">
+                    <h4>🛠️ Application Management</h4>
+                    <div class="row">
+                        <button class="btn btn-info" onclick="showAppInfo()">ℹ️ App Info</button>
+                        <button class="btn btn-warning" onclick="resetSettings()">🔄 Reset</button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h4>🗂️ Data Management</h4>
+                    <div class="row">
+                        <button class="btn btn-secondary" onclick="exportSettings()">📤 Export</button>
+                        <button class="btn btn-secondary" onclick="importSettings()">📥 Import</button>
+                    </div>
+                </div>
+
+                <div class="danger-zone">
+                    <h4>⚠️ Danger Zone</h4>
+                    <p>This will completely remove TikFinityLive from your system, including all settings, saved data, and auto-startup configuration.</p>
+                    <button class="btn btn-danger" onclick="showUninstallConfirm()">🗑️ Uninstall Application</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Uninstall Confirmation Modal -->
+        <div id="uninstall-modal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000;">
+            <div class="card" style="max-width: 400px; margin: 20px;">
+                <h3 style="color: #dc3545; margin-bottom: 15px;">🗑️ Confirm Uninstall</h3>
+                <p style="margin-bottom: 20px; font-size: 13px; line-height: 1.4;">Are you sure you want to completely uninstall TikFinityLive? This action cannot be undone.</p>
+                <div style="margin-bottom: 15px; font-size: 12px; color: #666;">
+                    <div>✓ Remove auto-startup</div>
+                    <div>✓ Delete all settings</div>
+                    <div>✓ Clear saved data</div>
+                </div>
+                <div class="row">
+                    <button class="btn btn-danger" onclick="performUninstall()">Yes, Uninstall</button>
+                    <button class="btn btn-secondary" onclick="hideUninstallConfirm()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        let currentSettings = {};
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.settings-tab, .monitor-tab, .advanced-tab').forEach(tab => tab.classList.add('hidden'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+        }
+
+        // Load settings on startup
+        async function loadSettings() {
+            try {
+                currentSettings = await ipcRenderer.invoke('get-settings');
+                document.getElementById('username').value = currentSettings.username || '';
+                document.getElementById('webhookUrl').value = currentSettings.webhookUrl || '';
+                document.getElementById('autoStart').checked = currentSettings.autoStart || false;
+                document.getElementById('minimizeToTray').checked = currentSettings.minimizeToTray !== false;
+                document.getElementById('showNotifications').checked = currentSettings.showNotifications !== false;
+                document.getElementById('inactivityTimeout').value = currentSettings.inactivityTimeout || '30';
+                document.getElementById('reconnectOnFailure').checked = currentSettings.reconnectOnFailure !== false;
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        // Save settings
+        async function saveSettings() {
+            const settings = {
+                username: document.getElementById('username').value.trim(),
+                webhookUrl: document.getElementById('webhookUrl').value.trim(),
+                autoStart: document.getElementById('autoStart').checked,
+                minimizeToTray: document.getElementById('minimizeToTray').checked,
+                showNotifications: document.getElementById('showNotifications').checked,
+                inactivityTimeout: parseInt(document.getElementById('inactivityTimeout').value),
+                reconnectOnFailure: document.getElementById('reconnectOnFailure').checked
+            };
+
+            try {
+                await ipcRenderer.invoke('save-settings', settings);
+                currentSettings = settings;
+                addLogEntry('Settings saved successfully');
+                
+                const saveBtn = event.target;
+                const originalText = saveBtn.textContent;
+                saveBtn.textContent = '✅ Saved!';
+                saveBtn.style.background = '#28a745';
+                setTimeout(() => {
+                    saveBtn.textContent = originalText;
+                    saveBtn.style.background = '';
+                }, 2000);
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                addLogEntry('Error saving settings');
+            }
+        }
+
+        // Start monitoring
+        async function startMonitoring() {
+            const username = currentSettings.username;
+            if (!username) {
+                alert('Please enter a TikTok username in Settings first');
+                showTab('settings');
+                return;
+            }
+
+            try {
+                await ipcRenderer.invoke('start-monitoring', username);
+                document.getElementById('start-btn').classList.add('hidden');
+                document.getElementById('stop-btn').classList.remove('hidden');
+                addLogEntry(`Started monitoring @${username}`);
+            } catch (error) {
+                console.error('Error starting monitoring:', error);
+                addLogEntry('Error starting monitoring');
+            }
+        }
+
+        // Stop monitoring
+        async function stopMonitoring() {
+            try {
+                await ipcRenderer.invoke('stop-monitoring');
+                document.getElementById('start-btn').classList.remove('hidden');
+                document.getElementById('stop-btn').classList.add('hidden');
+                addLogEntry('Stopped monitoring');
+            } catch (error) {
+                console.error('Error stopping monitoring:', error);
+            }
+        }
+
+        // Advanced functions
+        async function showAppInfo() {
+            const info = await ipcRenderer.invoke('get-app-info');
+            alert(`TikFinityLive v1.0.0\n\nElectron: ${info.electronVersion}\nNode: ${info.nodeVersion}\nPlatform: ${info.platform}`);
+        }
+
+        async function resetSettings() {
+            if (confirm('Reset all settings to default? This cannot be undone.')) {
+                await ipcRenderer.invoke('reset-settings');
+                loadSettings();
+                addLogEntry('Settings reset to default');
+            }
+        }
+
+        async function exportSettings() {
+            const result = await ipcRenderer.invoke('export-settings');
+            if (result.success) {
+                addLogEntry(`Settings exported to ${result.path}`);
+            } else {
+                addLogEntry('Failed to export settings');
+            }
+        }
+
+        async function importSettings() {
+            const result = await ipcRenderer.invoke('import-settings');
+            if (result.success) {
+                loadSettings();
+                addLogEntry('Settings imported successfully');
+            } else {
+                addLogEntry('Failed to import settings');
+            }
+        }
+
+        function showUninstallConfirm() {
+            document.getElementById('uninstall-modal').classList.remove('hidden');
+            document.getElementById('uninstall-modal').style.display = 'flex';
+        }
+
+        function hideUninstallConfirm() {
+            document.getElementById('uninstall-modal').classList.add('hidden');
+            document.getElementById('uninstall-modal').style.display = 'none';
+        }
+
+        async function performUninstall() {
+            // Hide modal first
+            hideUninstallConfirm();
+            
+            // Double confirmation for safety
+            const confirmation1 = confirm('⚠️ FINAL WARNING ⚠️\n\nThis will PERMANENTLY delete TikFinityLive and ALL your settings.\n\nClick OK to continue with uninstall, or Cancel to abort.');
+            
+            if (!confirmation1) {
+                return;
+            }
+
+            const userInput = prompt('Please type "DELETE" (all caps) to confirm uninstall:');
+            
+            if (userInput !== 'DELETE') {
+                alert('Uninstall cancelled. You must type "DELETE" exactly.');
+                return;
+            }
+
+            try {
+                const result = await ipcRenderer.invoke('uninstall-app');
+                if (result.success) {
+                    alert('✅ TikFinityLive has been successfully uninstalled.\n\nThe application will now close.');
+                    await ipcRenderer.invoke('quit-app');
+                } else {
+                    alert('❌ Uninstall failed: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Uninstall error: ' + error.message);
+            }
+        }
+
+        // Add log entry
+        function addLogEntry(message) {
+            const logContainer = document.getElementById('log-container');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            while (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+
+        // Listen for connection status updates
+        ipcRenderer.on('connection-status', (event, status) => {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = `status ${status}`;
+            
+            switch(status) {
+                case 'live':
+                    statusEl.textContent = '🔴 LIVE - User is streaming! 🎥';
+                    addLogEntry('User confirmed LIVE - Discord notification sent!');
+                    break;
+                case 'connected-waiting':
+                    statusEl.textContent = '⏳ Connected - Waiting for live stream...';
+                    addLogEntry('Connected but user not live yet - monitoring...');
+                    break;
+                case 'disconnected':
+                    statusEl.textContent = '⚫ Disconnected - Stream ended';
+                    addLogEntry('Stream ended or disconnected');
+                    break;
+                case 'stopped':
+                    statusEl.textContent = 'Not monitoring';
+                    break;
+            }
+        });
+
+        // Listen for TikTok events
+        ipcRenderer.on('tiktok-event', (event, eventData) => {
+            const { type, data } = eventData;
+            switch(type) {
+                case 'chat':
+                    addLogEntry(`💬 ${data.uniqueId}: ${data.comment}`);
+                    break;
+                case 'gift':
+                    addLogEntry(`🎁 ${data.uniqueId} sent ${data.giftName} x${data.repeatCount}`);
+                    break;
+                case 'like':
+                    addLogEntry(`❤️ ${data.uniqueId} liked (${data.likeCount} total)`);
+                    break;
+                case 'member':
+                    addLogEntry(`👋 ${data.uniqueId} joined the stream`);
+                    break;
+            }
+        });
+
+        // Listen for tray events
+        ipcRenderer.on('tray-start-monitoring', () => {
+            // Switch to monitor tab and start monitoring
+            showTab('monitor');
+            startMonitoring();
+        });
+
+        // Initialize app
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+        });
+    </script>
+</body>
+</html>

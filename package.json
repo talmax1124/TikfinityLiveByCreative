@@ -1,8 +1,130 @@
 {
+  "name": "TikFinityLive",
+  "version": "1.0.0",
+  "description": "TikTok Live Stream Notifier with Discord Webhooks",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "uninstall": "electron uninstaller.js",
+    "build": "electron-builder",
+    "build-mac": "electron-builder --mac --publish=never",
+    "build-win": "electron-builder --win --publish=never",
+    "build-linux": "electron-builder --linux --publish=never",
+    "release": "electron-builder --publish=always",
+    "generate-icons": "node convert-icon.js"
+  },
   "dependencies": {
+    "auto-launch": "^5.0.6",
+    "axios": "^1.12.2",
     "dotenv": "^16.0.0",
     "express": "^4.17.2",
     "socket.io": "^4.4.1",
     "tiktok-live-connector": "^1.1.5"
-  }
+  },
+  "devDependencies": {
+    "electron": "^38.3.0",
+    "electron-builder": "^26.0.12",
+    "electron-icon-builder": "^2.0.1",
+    "png-to-ico": "^3.0.1"
+  },
+  "build": {
+    "appId": "com.tikfinitylive.app",
+    "productName": "TikFinityLive",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "connectionWrapper.js",
+      "limiter.js",
+      "TikFinityLive.{ico,icns,png}",
+      "node_modules/**/*",
+      "!node_modules/.cache/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "YOUR_GITHUB_USERNAME",
+      "repo": "YOUR_REPO_NAME"
+    },
+    "mac": {
+      "icon": "TikFinityLive.icns",
+      "category": "public.app-category.social-networking",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": false
+    },
+    "win": {
+      "icon": "TikFinityLive.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64", "ia32"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "TikFinityLive.ico",
+      "uninstallerIcon": "TikFinityLive.ico",
+      "installerHeaderIcon": "TikFinityLive.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TikFinityLive"
+    },
+    "dmg": {
+      "icon": "TikFinityLive.icns",
+      "iconSize": 100,
+      "contents": [
+        {
+          "x": 380,
+          "y": 280,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 110,
+          "y": 280,
+          "type": "file"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "linux": {
+      "icon": "TikFinityLive.png",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Network"
+    }
+  },
+  "author": "TikFinityLive",
+  "license": "MIT"
 }
