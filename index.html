@@ -15,7 +15,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             height: 100vh;
-            overflow: hidden;
+            overflow-y: auto;
         }
 
         .container {
@@ -25,6 +25,7 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
         }
 
         .header {
@@ -201,7 +202,45 @@
             padding: 15px;
             overflow-y: auto;
             margin-bottom: 15px;
-            max-height: 180px;
+            max-height: 200px;
+            min-height: 120px;
+        }
+        
+        /* Custom scrollbar styling */
+        .activity-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .activity-log::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .activity-log::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 4px;
+        }
+        
+        .activity-log::-webkit-scrollbar-thumb:hover {
+            background: #5a6fd8;
+        }
+        
+        .container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .container::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        
+        .container::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+        }
+        
+        .container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.5);
         }
 
         .activity-log h3 {
@@ -372,7 +411,7 @@
                     </div>
                 </div>
 
-                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+                <button class="btn btn-primary" onclick="saveSettings(event)">💾 Save Settings</button>
             </div>
         </div>
 
@@ -473,7 +512,7 @@
         }
 
         // Save settings
-        async function saveSettings() {
+        async function saveSettings(event) {
             const settings = {
                 username: document.getElementById('username').value.trim(),
                 webhookUrl: document.getElementById('webhookUrl').value.trim(),
@@ -485,21 +524,30 @@
             };
 
             try {
-                await ipcRenderer.invoke('save-settings', settings);
+                console.log('Saving settings:', settings);
+                const result = await ipcRenderer.invoke('save-settings', settings);
+                console.log('Settings save result:', result);
+                
                 currentSettings = settings;
                 addLogEntry('Settings saved successfully');
                 
-                const saveBtn = event.target;
-                const originalText = saveBtn.textContent;
-                saveBtn.textContent = '✅ Saved!';
-                saveBtn.style.background = '#28a745';
-                setTimeout(() => {
-                    saveBtn.textContent = originalText;
-                    saveBtn.style.background = '';
-                }, 2000);
+                // Get the save button - either from event or by ID
+                const saveBtn = event?.target || document.querySelector('.btn-primary');
+                if (saveBtn) {
+                    const originalText = saveBtn.textContent;
+                    saveBtn.textContent = '✅ Saved!';
+                    saveBtn.style.background = '#28a745';
+                    setTimeout(() => {
+                        saveBtn.textContent = originalText;
+                        saveBtn.style.background = '';
+                    }, 2000);
+                }
             } catch (error) {
                 console.error('Error saving settings:', error);
-                addLogEntry('Error saving settings');
+                addLogEntry('Error saving settings: ' + error.message);
+                
+                // Show error to user
+                alert('Failed to save settings: ' + error.message);
             }
         }
 
@@ -599,7 +647,19 @@
             try {
                 const result = await ipcRenderer.invoke('uninstall-app');
                 if (result.success) {
-                    alert('✅ TikFinityLive has been successfully uninstalled.\n\nThe application will now close.');
+                    let message = '✅ TikFinityLive cleanup completed:\n\n';
+                    
+                    if (result.autoLaunchRemoved) {
+                        message += '• Auto-startup removed\n';
+                    }
+                    if (result.dataCleanedUp) {
+                        message += '• Settings and data cleared\n';
+                    }
+                    
+                    message += '\n📁 To complete uninstall:\n' + result.instructions;
+                    message += '\n\nThe application will now close.';
+                    
+                    alert(message);
                     await ipcRenderer.invoke('quit-app');
                 } else {
                     alert('❌ Uninstall failed: ' + result.error);

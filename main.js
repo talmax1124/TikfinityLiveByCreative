@@ -1,8 +1,33 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const AutoLaunch = require('auto-launch');
 const { TikTokConnectionWrapper } = require('./connectionWrapper');
 const axios = require('axios');
+
+// Data storage paths
+const userData = app.getPath('userData');
+const dataDir = path.join(userData, 'stream-data');
+const sessionFile = path.join(dataDir, 'current-session.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+
+// Current session data
+let currentSession = {
+    username: null,
+    startTime: null,
+    events: [],
+    stats: {
+        totalMessages: 0,
+        totalGifts: 0,
+        totalLikes: 0,
+        totalMembers: 0,
+        totalDiamonds: 0
+    }
+};
 
 let mainWindow;
 let tray;
@@ -13,11 +38,106 @@ let liveEndNotified = false;
 let lastActivityTime = null;
 let inactivityTimer = null;
 
+// Data storage functions
+const saveCurrentSession = () => {
+    try {
+        fs.writeFileSync(sessionFile, JSON.stringify(currentSession, null, 2));
+    } catch (error) {
+        console.error('Failed to save session data:', error);
+    }
+};
+
+const loadCurrentSession = () => {
+    try {
+        if (fs.existsSync(sessionFile)) {
+            const data = fs.readFileSync(sessionFile, 'utf8');
+            currentSession = JSON.parse(data);
+        }
+    } catch (error) {
+        console.error('Failed to load session data:', error);
+    }
+};
+
+const saveStreamEvent = (type, data) => {
+    const event = {
+        type,
+        timestamp: new Date().toISOString(),
+        data: { ...data }
+    };
+    
+    currentSession.events.push(event);
+    
+    // Update stats
+    switch (type) {
+        case 'chat':
+            currentSession.stats.totalMessages++;
+            break;
+        case 'gift':
+            currentSession.stats.totalGifts++;
+            currentSession.stats.totalDiamonds += (data.diamondCount || 0) * (data.repeatCount || 1);
+            break;
+        case 'like':
+            currentSession.stats.totalLikes++;
+            break;
+        case 'member':
+            currentSession.stats.totalMembers++;
+            break;
+    }
+    
+    // Save to file every 10 events or immediately for gifts
+    if (currentSession.events.length % 10 === 0 || type === 'gift') {
+        saveCurrentSession();
+    }
+};
+
+const finalizeSession = () => {
+    if (currentSession.username && currentSession.events.length > 0) {
+        const endTime = new Date().toISOString();
+        const duration = new Date(endTime) - new Date(currentSession.startTime);
+        
+        // Create final session file
+        const sessionData = {
+            ...currentSession,
+            endTime,
+            duration: Math.floor(duration / 1000) // duration in seconds
+        };
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const finalFile = path.join(dataDir, `session-${currentSession.username}-${timestamp}.json`);
+        
+        try {
+            fs.writeFileSync(finalFile, JSON.stringify(sessionData, null, 2));
+            console.log(`Session saved to: ${finalFile}`);
+        } catch (error) {
+            console.error('Failed to save final session:', error);
+        }
+    }
+    
+    // Reset current session
+    currentSession = {
+        username: null,
+        startTime: null,
+        events: [],
+        stats: {
+            totalMessages: 0,
+            totalGifts: 0,
+            totalLikes: 0,
+            totalMembers: 0,
+            totalDiamonds: 0
+        }
+    };
+    
+    saveCurrentSession();
+};
+
 // Initialize auto-launch
 const initAutoLaunch = () => {
+    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    
     appLauncher = new AutoLaunch({
         name: 'TikFinityLive',
-        path: app.getPath('exe'),
+        path: isDev ? process.execPath : app.getPath('exe'),
+        isHidden: false
     });
 };
 
@@ -164,45 +284,50 @@ const showMainWindow = () => {
 const checkIfUserIsLive = (state) => {
     // Check various indicators that the user is live
     const hasRoomInfo = state.roomInfo && typeof state.roomInfo === 'object';
-    
-    if (!hasRoomInfo) {
-        console.log('No room info available - user likely not live');
-        return false;
-    }
-    
-    const roomInfo = state.roomInfo;
-    
-    // Check multiple live status indicators
-    const streamStatus = roomInfo.stream_status;
-    const isReplay = roomInfo.is_replay;
-    const liveTypeNormal = roomInfo.live_type_normal;
     const hasRoomId = state.roomId && state.roomId !== '';
     
-    // Log the room info for debugging
-    console.log('Room Info Debug:', {
-        stream_status: streamStatus,
-        is_replay: isReplay,
-        live_type_normal: liveTypeNormal,
-        room_id: state.roomId,
-        has_room_info: hasRoomInfo
+    // Log the full state for debugging
+    console.log('Live Detection Debug - Full State:', {
+        hasRoomInfo,
+        hasRoomId,
+        isConnected: state.isConnected,
+        upgradedToWebsocket: state.upgradedToWebsocket,
+        roomInfo: state.roomInfo
     });
     
-    // User is considered live if:
-    // 1. Stream status indicates live (usually 2 or 4)
-    // 2. Not a replay
-    // 3. Has a valid room ID
-    // 4. Live type is normal (if available)
-    const isLive = (
-        hasRoomId &&
-        streamStatus && 
-        streamStatus !== 0 && 
-        streamStatus !== 1 && // Not offline
-        !isReplay &&
-        (liveTypeNormal === undefined || liveTypeNormal === true)
-    );
+    // If we have a room ID and are connected, we're likely live
+    // This is the most reliable indicator
+    if (hasRoomId && state.isConnected) {
+        console.log('✅ User detected as LIVE - has room ID and is connected');
+        return true;
+    }
     
-    console.log(`Live status check result: ${isLive}`);
-    return isLive;
+    // Secondary check with room info if available
+    if (hasRoomInfo) {
+        const roomInfo = state.roomInfo;
+        const streamStatus = roomInfo.stream_status;
+        const isReplay = roomInfo.is_replay;
+        
+        console.log('Room Info Secondary Check:', {
+            stream_status: streamStatus,
+            is_replay: isReplay
+        });
+        
+        // More lenient check for live status
+        const isLiveFromRoomInfo = (
+            streamStatus !== undefined &&
+            streamStatus !== 0 && // Not explicitly offline
+            !isReplay
+        );
+        
+        if (isLiveFromRoomInfo) {
+            console.log('✅ User detected as LIVE from room info');
+            return true;
+        }
+    }
+    
+    console.log('❌ User not detected as live');
+    return false;
 };
 
 // Send "Live Ended" Discord notification
@@ -292,30 +417,68 @@ ipcMain.handle('get-settings', () => {
 });
 
 ipcMain.handle('save-settings', async (event, settings) => {
-    global.settings = settings;
-    
-    // Handle auto-start
-    if (settings.autoStart) {
-        await appLauncher.enable();
-    } else {
-        await appLauncher.disable();
-    }
-
-    // Update inactivity timeout if currently monitoring
-    if (inactivityTimer && settings.inactivityTimeout) {
-        clearTimeout(inactivityTimer);
-        if (isLiveNotified) {
-            startInactivityTimer(settings.username, settings.inactivityTimeout);
+    try {
+        global.settings = settings;
+        
+        // Handle auto-start only if appLauncher is initialized
+        if (appLauncher) {
+            try {
+                const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+                
+                if (isDev) {
+                    // In development mode, just log the setting but don't actually set auto-start
+                    console.log(`Auto-start ${settings.autoStart ? 'enabled' : 'disabled'} (dev mode - not actually set)`);
+                } else {
+                    // In production mode, actually set auto-start
+                    if (settings.autoStart) {
+                        await appLauncher.enable();
+                    } else {
+                        await appLauncher.disable();
+                    }
+                }
+            } catch (autoLaunchError) {
+                console.warn('Auto-launch error (non-critical):', autoLaunchError.message);
+                // Don't throw the error, just log it as auto-launch is not critical
+            }
+        } else {
+            console.log('Auto-launch not available yet - will be applied when app is ready');
         }
-    }
 
-    return true;
+        // Update inactivity timeout if currently monitoring
+        if (inactivityTimer && settings.inactivityTimeout) {
+            clearTimeout(inactivityTimer);
+            if (isLiveNotified) {
+                startInactivityTimer(settings.username, settings.inactivityTimeout);
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        throw error;
+    }
 });
 
 ipcMain.handle('start-monitoring', (event, username) => {
     if (tiktokConnection) {
         tiktokConnection.disconnect();
+        finalizeSession(); // Save previous session
     }
+
+    // Initialize new session
+    currentSession = {
+        username,
+        startTime: new Date().toISOString(),
+        events: [],
+        stats: {
+            totalMessages: 0,
+            totalGifts: 0,
+            totalLikes: 0,
+            totalMembers: 0,
+            totalDiamonds: 0
+        }
+    };
+    saveCurrentSession();
 
     tiktokConnection = new TikTokConnectionWrapper(username, {}, true);
 
@@ -363,14 +526,62 @@ ipcMain.handle('start-monitoring', (event, username) => {
         liveEndNotified = false;
     });
 
+    // Listen for state changes that might indicate going live
+    tiktokConnection.connection.on('streamEnd', () => {
+        console.log(`Stream ended for ${username}`);
+        mainWindow.webContents.send('connection-status', 'disconnected');
+        
+        // Send live ended notification if user was live
+        if (isLiveNotified && !liveEndNotified && global.settings?.webhookUrl) {
+            sendLiveEndedNotification(username, global.settings.webhookUrl);
+            liveEndNotified = true;
+        }
+        
+        isLiveNotified = false;
+        liveEndNotified = false;
+    });
+
+    // Listen for any activity that indicates the stream is live
+    tiktokConnection.connection.on('member', (data) => {
+        // If we get member events, the stream is definitely live
+        if (!isLiveNotified) {
+            console.log(`${username} confirmed LIVE via member activity!`);
+            mainWindow.webContents.send('connection-status', 'live');
+            
+            if (global.settings?.webhookUrl) {
+                sendDiscordNotification(username, global.settings.webhookUrl);
+                isLiveNotified = true;
+                liveEndNotified = false;
+            }
+        }
+        
+        resetActivityTimer(username);
+        saveStreamEvent('member', data);
+        mainWindow.webContents.send('tiktok-event', { type: 'member', data });
+    });
+
     // Forward TikTok events to renderer and track activity
-    ['chat', 'gift', 'member', 'like', 'social', 'emote'].forEach(event => {
+    ['chat', 'gift', 'like', 'social', 'emote'].forEach(event => {
         tiktokConnection.connection.on(event, (data) => {
+            // If we get any live activity, confirm the stream is live
+            if (!isLiveNotified) {
+                console.log(`${username} confirmed LIVE via ${event} activity!`);
+                mainWindow.webContents.send('connection-status', 'live');
+                
+                if (global.settings?.webhookUrl) {
+                    sendDiscordNotification(username, global.settings.webhookUrl);
+                    isLiveNotified = true;
+                    liveEndNotified = false;
+                }
+            }
+            
             // Reset activity timer on any live stream activity
             if (isLiveNotified) {
                 resetActivityTimer(username);
             }
             
+            // Save event data locally
+            saveStreamEvent(event, data);
             mainWindow.webContents.send('tiktok-event', { type: event, data });
         });
     });
@@ -385,6 +596,9 @@ ipcMain.handle('stop-monitoring', () => {
         tiktokConnection = null;
     }
     
+    // Finalize and save session data
+    finalizeSession();
+    
     // Clear timers and reset flags
     if (inactivityTimer) {
         clearTimeout(inactivityTimer);
@@ -396,6 +610,53 @@ ipcMain.handle('stop-monitoring', () => {
     
     mainWindow.webContents.send('connection-status', 'stopped');
     return true;
+});
+
+// Data access handlers
+ipcMain.handle('get-current-session', () => {
+    return currentSession;
+});
+
+ipcMain.handle('get-saved-sessions', () => {
+    try {
+        const files = fs.readdirSync(dataDir)
+            .filter(file => file.startsWith('session-') && file.endsWith('.json'))
+            .map(file => {
+                const filePath = path.join(dataDir, file);
+                const stats = fs.statSync(filePath);
+                return {
+                    filename: file,
+                    path: filePath,
+                    size: stats.size,
+                    modified: stats.mtime
+                };
+            })
+            .sort((a, b) => b.modified - a.modified);
+        
+        return { success: true, sessions: files };
+    } catch (error) {
+        console.error('Failed to list saved sessions:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('export-session-data', async (event, sessionPath) => {
+    try {
+        const result = await dialog.showSaveDialog(mainWindow, {
+            title: 'Export Session Data',
+            filters: [{ name: 'JSON Files', extensions: ['json'] }],
+            defaultPath: path.basename(sessionPath)
+        });
+        
+        if (!result.canceled) {
+            fs.copyFileSync(sessionPath, result.filePath);
+            return { success: true, path: result.filePath };
+        }
+        return { success: false, cancelled: true };
+    } catch (error) {
+        console.error('Export session error:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 // Advanced app functions
@@ -465,25 +726,49 @@ ipcMain.handle('uninstall-app', async () => {
             tiktokConnection = null;
         }
         
+        // Clear timers
+        if (inactivityTimer) {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = null;
+        }
+        
         // Remove auto-launch
         let autoLaunchRemoved = false;
         try {
-            const isEnabled = await appLauncher.isEnabled();
-            if (isEnabled) {
-                await appLauncher.disable();
-                autoLaunchRemoved = true;
+            if (appLauncher) {
+                const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+                
+                if (isDev) {
+                    console.log('Auto-launch removal skipped in development mode');
+                    autoLaunchRemoved = true; // Consider it "removed" in dev mode
+                } else {
+                    const isEnabled = await appLauncher.isEnabled();
+                    if (isEnabled) {
+                        await appLauncher.disable();
+                        autoLaunchRemoved = true;
+                    }
+                }
             }
         } catch (error) {
-            console.error('Error removing auto-launch:', error);
+            console.warn('Error removing auto-launch (non-critical):', error.message);
         }
         
-        // Clear app data
+        // Clear app data and settings
         global.settings = {};
+        
+        // Get app path for manual removal instructions
+        const appPath = process.execPath;
+        const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
         
         return {
             success: true,
             autoLaunchRemoved,
-            dataCleanedUp: true
+            dataCleanedUp: true,
+            isDevelopment: isDev,
+            appPath: isDev ? process.cwd() : appPath,
+            instructions: isDev 
+                ? 'Development mode: Delete the project folder manually after closing this app.'
+                : 'Drag TikFinityLive.app from Applications folder to Trash after this app closes.'
         };
     } catch (error) {
         console.error('Uninstall error:', error);
@@ -500,7 +785,7 @@ ipcMain.handle('quit-app', () => {
 });
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     initAutoLaunch();
     createWindow();
     createTray();
@@ -508,6 +793,19 @@ app.whenReady().then(() => {
     // Initialize global settings
     global.settings = {};
     global.hasShownTrayNotification = false;
+    
+    // Load existing session data
+    loadCurrentSession();
+    
+    // Apply auto-start setting if it was saved before app was ready
+    if (global.settings?.autoStart && appLauncher) {
+        try {
+            await appLauncher.enable();
+            console.log('Applied delayed auto-start setting');
+        } catch (error) {
+            console.error('Error applying delayed auto-start:', error);
+        }
+    }
 
     app.on('activate', () => {
         // On macOS, re-create window when dock icon is clicked and no windows are open
@@ -537,6 +835,9 @@ app.on('before-quit', () => {
         tiktokConnection.disconnect();
         tiktokConnection = null;
     }
+    
+    // Finalize and save any active session
+    finalizeSession();
     
     // Clear timers
     if (inactivityTimer) {
